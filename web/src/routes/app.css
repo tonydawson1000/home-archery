@@ -1,0 +1,84 @@
+:root {
+	font-family: system-ui, sans-serif;
+	color-scheme: dark;
+	background: #111;
+	color: #f4f4f4;
+}
+
+body {
+	margin: 0;
+}
+
+main {
+	max-width: 28rem;
+	margin: 0 auto;
+	padding: 1rem;
+}
+
+.hit {
+	display: block;
+	width: 100%;
+	min-height: 3.25rem;
+	margin: 0.5rem 0;
+	font-size: 1.25rem;
+	border-radius: 0.5rem;
+	border: 0;
+	background: #2a2a2a;
+	color: inherit;
+}
+
+.hit.primary {
+	background: #c45c26;
+}
+
+.hit:disabled {
+	opacity: 0.4;
+}
+
+.total {
+	font-size: 4rem;
+	text-align: center;
+	margin: 0.25rem 0;
+}
+
+.slots {
+	display: grid;
+	grid-template-columns: repeat(6, 1fr);
+	gap: 0.25rem;
+	padding: 0;
+	list-style: none;
+}
+
+.slots li {
+	min-height: 2.5rem;
+	border: 1px solid #444;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.pad .row {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 0.5rem;
+}
+
+.pad .hit {
+	margin: 0;
+}
+
+header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+
+header .hit {
+	width: auto;
+	padding: 0 1rem;
+}
+
+.hint {
+	opacity: 0.75;
+	font-size: 0.9rem;
+}
