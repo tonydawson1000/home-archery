@@ -9,7 +9,7 @@ v1 stack: Postgres, Go API (OpenAPI), SvelteKit PWA. Design artefacts:
 - [Schema](db/migrations/001_create_schema.sql)
 - [HTTP contract](spec/openapi.yaml)
 
-Implementation uses TDD (order in the architecture doc). The Go domain, application use cases, HTTP adapter, and Postgres adapter exist. The PWA comes later.
+Implementation uses TDD (order in the architecture doc). The Go API (in-memory or Postgres) and a mock-first SvelteKit PWA exist.
 
 Containers use **Podman** (`podman compose`), not Docker.
 
@@ -76,3 +76,20 @@ go run ./cmd/api
 ```
 
 Default listen address is `:8080` (`HTTP_ADDR` overrides). Without `DATABASE_URL` the process is in-memory (restart wipes sessions). With the same `DATABASE_URL` as the adapter tests, the log should say `postgres`. Then `GET /api/v1/healthz` and `GET /api/v1/archers`.
+
+## PWA (this slice)
+
+Mock-first SvelteKit app in `web/`. Unit tests use fixtures and a stubbed `fetch`; they do **not** need the Go API, Podman, or a database. The UI displays API `summary` fields and does not rescore arrows.
+
+```bash
+cd web
+npm install
+npm test
+```
+
+Local UI: `npm run dev` (from `web/`). Pointing Vite at a live API is optional later; it is not required for `npm test`.
+
+`npm audit` on `web/`:
+
+- Findings are in **devDependencies** (Vitest / `tinypool` criticals; SvelteKit `cookie` low). They are not browser-runtime RCE.
+- Do not run `npm audit fix --force` (Vitest 5 + Kit 3 break the current stack). Follow-up: Vitest 5 for the test-runner CVEs; Kit 3 with the Vite 8 bump.
