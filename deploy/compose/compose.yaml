@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: archery
+      POSTGRES_PASSWORD: archery
+      POSTGRES_DB: home_archery
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../../db/migrations/001_create_schema.sql:/docker-entrypoint-initdb.d/001_create_schema.sql:ro
+      - ../../db/seed/001_archers.sql:/docker-entrypoint-initdb.d/002_archers.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U archery -d home_archery"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

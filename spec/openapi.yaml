@@ -1,0 +1,356 @@
+openapi: 3.0.3
+info:
+  title: Home Archery API
+  version: 0.1.0
+  description: |
+    v1 scoring API for household archers. JSON over `/api/v1`.
+    No authentication; callers pass `archerId`. Arrows are append-only.
+servers:
+  - url: /api/v1
+    description: Relative to the API host
+tags:
+  - name: health
+  - name: archers
+  - name: sessions
+paths:
+  /healthz:
+    get:
+      tags: [health]
+      operationId: getHealthz
+      summary: Liveness
+      responses:
+        '200':
+          description: Process is up
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+  /archers:
+    get:
+      tags: [archers]
+      operationId: listArchers
+      summary: List archers for the picker
+      responses:
+        '200':
+          description: Seeded archers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Archer'
+  /archers/{archerId}/sessions:
+    get:
+      tags: [sessions]
+      operationId: listSessions
+      summary: Previous sessions for an archer
+      description: Newest first. Projection fields only (no ends or arrows).
+      parameters:
+        - $ref: '#/components/parameters/ArcherId'
+      responses:
+        '200':
+          description: Session list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SessionListItem'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [sessions]
+      operationId: startSession
+      summary: Record an archery session
+      description: Creates an in-progress practice session (ends of 6 arrows).
+      parameters:
+        - $ref: '#/components/parameters/ArcherId'
+      responses:
+        '201':
+          description: Session started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /archers/{archerId}/personal-best:
+    get:
+      tags: [archers]
+      operationId: getPersonalBest
+      summary: Personal bests for an archer
+      description: |
+        Highest completed session total, compared only among sessions with the same
+        arrow count. Omit `arrowCount` to return one best per arrow-count bucket.
+        Pass `arrowCount` to return a single object or 404 if none.
+      parameters:
+        - $ref: '#/components/parameters/ArcherId'
+        - name: arrowCount
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+          description: Filter to a single comparable length (for example 60)
+      responses:
+        '200':
+          description: Personal best or list of bests
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/PersonalBest'
+                  - type: array
+                    items:
+                      $ref: '#/components/schemas/PersonalBest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /sessions/{sessionId}:
+    get:
+      tags: [sessions]
+      operationId: getSession
+      summary: Session scorecard including total
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: Full session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /sessions/{sessionId}/arrows:
+    post:
+      tags: [sessions]
+      operationId: recordArrow
+      summary: Record an individual arrow score
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecordArrowRequest'
+      responses:
+        '201':
+          description: Arrow recorded and running summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecordArrowResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /sessions/{sessionId}/complete:
+    post:
+      tags: [sessions]
+      operationId: completeSession
+      summary: Finish a session so it counts toward personal best
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: Session completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+components:
+  parameters:
+    ArcherId:
+      name: archerId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    SessionId:
+      name: sessionId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    BadRequest:
+      description: Invalid arrow code or request body
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Archer or session not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Conflict:
+      description: Session already completed, empty complete, or other invariant
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    HealthResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          example: ok
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          example: session_completed
+        message:
+          type: string
+    Archer:
+      type: object
+      required: [id, displayName]
+      properties:
+        id:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+          example: Becky
+    ScoreCode:
+      type: string
+      enum: [X, '10', '9', '8', '7', '6', '5', '4', '3', '2', '1', M]
+    SessionStatus:
+      type: string
+      enum: [in_progress, completed]
+    ScoreSummary:
+      type: object
+      required: [total, hits, golds, xCount, arrowCount]
+      properties:
+        total:
+          type: integer
+          minimum: 0
+        hits:
+          type: integer
+          minimum: 0
+        golds:
+          type: integer
+          minimum: 0
+          description: Count of X, 10, and 9
+        xCount:
+          type: integer
+          minimum: 0
+        arrowCount:
+          type: integer
+          minimum: 0
+    Arrow:
+      type: object
+      required: [id, arrowNumber, scoreCode, scoreValue, recordedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        arrowNumber:
+          type: integer
+          minimum: 1
+          maximum: 6
+        scoreCode:
+          $ref: '#/components/schemas/ScoreCode'
+        scoreValue:
+          type: integer
+          minimum: 0
+          maximum: 10
+        recordedAt:
+          type: string
+          format: date-time
+    End:
+      type: object
+      required: [endNumber, arrows]
+      properties:
+        endNumber:
+          type: integer
+          minimum: 1
+        arrows:
+          type: array
+          items:
+            $ref: '#/components/schemas/Arrow'
+    SessionListItem:
+      type: object
+      required: [id, archerId, status, startedAt, summary]
+      properties:
+        id:
+          type: string
+          format: uuid
+        archerId:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/SessionStatus'
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        summary:
+          $ref: '#/components/schemas/ScoreSummary'
+    Session:
+      allOf:
+        - $ref: '#/components/schemas/SessionListItem'
+        - type: object
+          required: [arrowsPerEnd, ends]
+          properties:
+            arrowsPerEnd:
+              type: integer
+              enum: [6]
+            ends:
+              type: array
+              items:
+                $ref: '#/components/schemas/End'
+    PersonalBest:
+      type: object
+      required: [archerId, sessionId, total, arrowCount, achievedAt]
+      properties:
+        archerId:
+          type: string
+          format: uuid
+        sessionId:
+          type: string
+          format: uuid
+        total:
+          type: integer
+          minimum: 0
+        arrowCount:
+          type: integer
+          minimum: 1
+        achievedAt:
+          type: string
+          format: date-time
+    RecordArrowRequest:
+      type: object
+      required: [scoreCode]
+      properties:
+        scoreCode:
+          $ref: '#/components/schemas/ScoreCode'
+    RecordArrowResponse:
+      type: object
+      required: [arrow, endNumber, summary]
+      properties:
+        arrow:
+          $ref: '#/components/schemas/Arrow'
+        endNumber:
+          type: integer
+          minimum: 1
+        summary:
+          $ref: '#/components/schemas/ScoreSummary'
