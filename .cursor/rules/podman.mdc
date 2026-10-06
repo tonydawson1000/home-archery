@@ -1,0 +1,12 @@
+---
+description: Prefer Podman over Docker for containers and Compose in this repo
+alwaysApply: true
+---
+
+# Podman
+
+Use **Podman**, not Docker, for local engines, Compose, and later CI.
+
+- Run Compose as `podman compose -f deploy/compose/compose.yaml …`
+- Do not add a Docker CLI dependency or document `docker compose` as the primary path
+- Adapter tests talk to Postgres via `DATABASE_URL`; they skip when it is unset

@@ -9,30 +9,70 @@ v1 stack: Postgres, Go API (OpenAPI), SvelteKit PWA. Design artefacts:
 - [Schema](db/migrations/001_create_schema.sql)
 - [HTTP contract](spec/openapi.yaml)
 
-Implementation uses TDD (order in the architecture doc). This slice has the Go domain, application use cases against in-memory ports, and an HTTP adapter. The PWA and Postgres adapter come later.
+Implementation uses TDD (order in the architecture doc). The Go domain, application use cases, HTTP adapter, and Postgres adapter exist. The PWA comes later.
+
+Containers use **Podman** (`podman compose`), not Docker.
 
 ## API (this slice)
 
-Tests do **not** need Compose or a database. Prerequisite: Go 1.23+ ([api/go.mod](api/go.mod)).
+Prerequisite: Go 1.25+ ([api/go.mod](api/go.mod)).
 
-Run tests from the module directory (`api/`, where `go.mod` lives — not the repo root):
+### Default tests (no database)
+
+Run from the module directory (`api/`, where `go.mod` lives — not the repo root):
 
 ```bash
 cd api
 go test ./...
 ```
 
-Verbose: `go test ./... -v`. One layer: `./internal/domain`, `./internal/application/...`, or `./internal/adapters/http`.
+Without `DATABASE_URL`, domain, application, memory, and HTTP run; Postgres adapter tests **SKIP** (`DATABASE_URL not set`). That is success. Verbose: `go test ./... -v`.
 
 zsh `CORRECT` may rewrite `./...` to `./..`. Answer `n` at the prompt, or add `alias go='nocorrect go'` / `unsetopt CORRECT`.
 
-Expect `ok` for domain, application, memory, and HTTP. `cmd/api` and `adapters/postgres` with no test files is expected.
+### Postgres adapter tests
 
-Optional smoke (in-memory process; restart wipes sessions):
+Needs Podman. On macOS, start the machine first. Commands below are from the **repo root** unless noted.
+
+1. Start the engine (ignore “already running”):
+
+```bash
+podman machine start
+```
+
+2. Start Postgres (do not rely on `--wait`; Homebrew `podman-compose` often fails it):
+
+```bash
+podman compose -f deploy/compose/compose.yaml up -d
+```
+
+3. Wait until the service is healthy. `podman ps` should show port `5432` and `healthy`. Or:
+
+```bash
+podman exec compose_postgres_1 pg_isready -U archery -d home_archery
+```
+
+4. From `api/`:
+
+```bash
+cd api
+DATABASE_URL='postgres://archery:archery@localhost:5432/home_archery?sslmode=disable' go test ./internal/adapters/postgres -v
+```
+
+5. Expect `PASS` for archer list/get, save/get/list, arrows and projections, and complete. Seeded Tony and Becky come from [db/seed/001_archers.sql](db/seed/001_archers.sql). Init SQL runs **only on an empty volume**. If archers are missing, recreate the volume (this destroys local DB data):
+
+```bash
+podman compose -f deploy/compose/compose.yaml down -v
+podman compose -f deploy/compose/compose.yaml up -d
+```
+
+If Compose cannot start, check the Podman machine is running. Overlay or storage errors (`readlink … overlay`) are a local Podman issue, not a missing Go test.
+
+### Serve
 
 ```bash
 cd api
 go run ./cmd/api
 ```
 
-Default listen address is `:8080` (`HTTP_ADDR` overrides). Then `GET /api/v1/healthz` and `GET /api/v1/archers`. Seeded Tony and Becky UUIDs match [db/seed/001_archers.sql](db/seed/001_archers.sql).
+Default listen address is `:8080` (`HTTP_ADDR` overrides). Without `DATABASE_URL` the process is in-memory (restart wipes sessions). With the same `DATABASE_URL` as the adapter tests, the log should say `postgres`. Then `GET /api/v1/healthz` and `GET /api/v1/archers`.
