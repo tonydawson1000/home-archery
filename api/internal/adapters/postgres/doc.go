@@ -1,6 +1,6 @@
-// Package postgres will persist Session and Archer via pgx.
+// Package postgres persists Session and Archer via pgx.
 //
-// Deferred until the application ports and in-memory contract tests are the
-// source of truth; this adapter must satisfy the same SessionRepository and
-// ArcherRepository interfaces (see application/memory).
+// It implements the same ArcherRepository and SessionRepository ports as
+// application/memory. Scoring rules stay in domain; SQL stores the aggregate
+// and projection columns.
 package postgres
