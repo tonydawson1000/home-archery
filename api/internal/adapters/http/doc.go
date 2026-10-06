@@ -1,2 +1,2 @@
-// Package httpapi will expose the OpenAPI HTTP adapter. Not implemented in this slice.
+// Package httpapi exposes the OpenAPI HTTP adapter over application use cases.
 package httpapi
